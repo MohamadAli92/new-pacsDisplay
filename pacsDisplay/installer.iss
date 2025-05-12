@@ -1,4 +1,4 @@
-; pacsDisplay Installer using Inno Setup with Wizard Tasks
+; pacsDisplay Installer using Inno Setup with Wizard Tasks + License Agreement
 ; ------------------------------------------------------
 [Setup]
 AppName=pacsDisplay
@@ -9,6 +9,8 @@ UninstallDisplayIcon={app}\pacsDisplay-BIN\main.exe
 Compression=lzma
 SolidCompression=yes
 OutputBaseFilename=pacsDisplayInstaller
+WizardSmallImageFile=logo.bmp
+LicenseFile=license.txt
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -21,13 +23,15 @@ Name: "run_config"; Description: "Run LLconfig after installation"; GroupDescrip
 
 [Files]
 Source: "pacsDisplay-BIN\*"; DestDir: "{app}\pacsDisplay-BIN"; Flags: recursesubdirs
-Source: "pacsDisplay-BIN\_ICONS\*"; DestDir: "{app}\_ICONS"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "pacsDisplay-BIN\_ICONS\*"; DestDir: "{app}\pacsDisplay-BIN\_ICONS"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "LUTs\*"; DestDir: "{code:GetLUTsDir}"; Flags: recursesubdirs; Tasks: overwrite_luts
 Source: "GNU-GPL.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "VERSION_INFO.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "QUICKSTART.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "pd-Manual.pdf"; DestDir: "{app}\pacsDisplay-BIN\_pd-Manual"; Flags: ignoreversion
 Source: "Links\64b_W7\shortcuts\allUsers_startMenu_programs_startup\loadLUT-dicom.lnk"; DestDir: "{commonstartup}"; Flags: ignoreversion
+Source: "license.txt"; DestDir: "{tmp}"; Flags: dontcopy
+Source: "logo.bmp"; DestDir: "{tmp}"; Flags: dontcopy
 
 [Icons]
 Name: "{group}\gtest"; Filename: "{app}\pacsDisplay-BIN\gtest\gtest.exe"; IconFilename: "{app}\pacsDisplay-BIN\_ICONS\gtest.ico"

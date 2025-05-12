@@ -1,0 +1,10 @@
+HFHS-pacsDisplay
+Copyright (C) Feb.2014
+Henry Ford Health System
+
+HFHS-pacsDisplay comes with ABSOLUTELY NO WARRANTY.
+
+This software is freely provided for non-commercial use by the authors and HFHS. The authors and HFHS cannot provide support and assume no responsibility for its use.
+
+You are welcome to redistribute it under the conditions of the GNU General Public License version 2 or any later version.
+See GNU-GPL.txt in the pacsDisplay directory for details.
