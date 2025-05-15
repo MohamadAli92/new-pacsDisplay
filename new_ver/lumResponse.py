@@ -1,0 +1,767 @@
+# from PySide6.QtWidgets import (
+#     QApplication, QWidget, QGraphicsView, QGraphicsScene,
+#     QGraphicsRectItem, QVBoxLayout
+# )
+# from PySide6.QtGui import QColor, QBrush, QPen
+# from PySide6.QtCore import QRectF, Qt
+# import sys
+#
+# # Color helpers
+# def Color(grey):
+#     hex_val = f"{grey:02x}"
+#     return f"#{hex_val}{hex_val}{hex_val}"
+#
+# def ColorRGB(grey, LUTmode=0, LUTphase=0, phase=None):
+#     if phase is None:
+#         phase = {0: [0, 0, 0]}
+#     def clamp(val):
+#         return max(0, min(val, 255))
+#     if grey >= 0:
+#         if grey == 255:
+#             return "#ffffff"
+#         elif LUTmode != 0:
+#             r_off, g_off, b_off = phase.get(LUTphase, [0, 0, 0])
+#             r = clamp(grey + r_off)
+#             g = clamp(grey + g_off)
+#             b = clamp(grey + b_off)
+#             return f"#{r:02x}{g:02x}{b:02x}"
+#         else:
+#             return Color(grey)
+#     else:
+#         return "#000000"
+#
+# def SetRect(width, height, rectX, rectY):
+#     bb_llx = width // 2 - rectX // 2
+#     bb_lly = height // 2 - rectY // 2
+#     bb_urx = width // 2 + rectX // 2
+#     bb_ury = height // 2 + rectY // 2
+#     return {
+#         "bb_llx": bb_llx,
+#         "bb_lly": bb_lly,
+#         "bb_urx": bb_urx,
+#         "bb_ury": bb_ury,
+#     }
+#
+# # GUI-enabled Initialize
+# def InitializeGUI(w_title="Luminance Response"):
+#
+#     width = 800
+#     height = 600
+#     rectX = 100
+#     rectY = 100
+#     initNum = 3
+#     Ngrey = {3: 128}
+#     greyR = 0
+#     greyR_offset = 0
+#     LUTmode = 0
+#     LUTphase = 0
+#     phase = {0: [0, 0, 0]}
+#
+#     greyB = Ngrey[initNum]
+#     greyR_display = f"{max(greyR + greyR_offset, 0):3d}"
+#
+#     bg_color = Color(greyB)
+#     fill_color = ColorRGB(greyR, LUTmode, LUTphase, phase)
+#
+#     # Create main window
+#     window = QWidget()
+#     window.setWindowTitle("lumResponse vers. 2.3")
+#     window.setFixedSize(width, height)
+#
+#     # Scene and view setup
+#     scene = QGraphicsScene()
+#     view = QGraphicsView(scene)
+#     view.setFixedSize(width, height)
+#     view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+#
+#     # Background color
+#     view.setStyleSheet(f"background-color: {bg_color};")
+#
+#     # Rectangle drawing
+#     rect_bounds = SetRect(width, height, rectX, rectY)
+#     rect = QRectF(
+#         rect_bounds["bb_llx"],
+#         rect_bounds["bb_lly"],
+#         rectX,
+#         rectY
+#     )
+#
+#     brush = QBrush(QColor(fill_color))
+#     pen = QPen(QColor(fill_color))
+#     rect_item = QGraphicsRectItem(rect)
+#     rect_item.setBrush(brush)
+#     rect_item.setPen(pen)
+#     scene.addItem(rect_item)
+#
+#     # Layout
+#     layout = QVBoxLayout(window)
+#     layout.setContentsMargins(0, 0, 0, 0)
+#     layout.addWidget(view)
+#
+#     window.show()
+#     return window  # in case you want to manage it externally
+#
+# # Main application runner
+# if __name__ == "__main__":
+#     app = QApplication(sys.argv)
+#     win = InitializeGUI()
+#     sys.exit(app.exec())
+
+import sys
+import globals
+from pathlib import Path
+import subprocess
+
+from PySide6.QtWidgets import (
+    QApplication, QWidget, QGraphicsView, QGraphicsScene,
+    QGraphicsRectItem, QVBoxLayout, QMessageBox, QFileDialog
+)
+from PySide6.QtGui import QColor, QBrush, QPen
+from PySide6.QtCore import QRectF, Qt
+
+
+def Color(grey):
+    red = f"{grey:02x}"
+    green = red
+    blue = red
+    return f"#{red}{green}{blue}"
+
+
+def ColorRGB(grey):
+    grey = max(0, min(grey, 255))
+
+    if globals.LUTmode and grey < 255:
+        shift = globals.phase.get(globals.LUTphase, [0, 0, 0])
+        r = max(0, min(grey + shift[0], 255))
+        g = max(0, min(grey + shift[1], 255))
+        b = max(0, min(grey + shift[2], 255))
+    else:
+        r = g = b = grey
+
+    color = f"#{r:02x}{g:02x}{b:02x}"
+    globals.lastRGB = color
+    return color
+
+
+def SetRect(width, height, rectX, rectY):
+    globals.bb_llx = width // 2 - rectX // 2
+    globals.bb_lly = height // 2 - rectY // 2
+    globals.bb_urx = width // 2 + rectX // 2
+    globals.bb_ury = height // 2 + rectY // 2
+
+
+# ---------- Initialize with GUI ----------
+def initialize():
+
+    w = QWidget()
+    w.resize(400, 400)
+    w.setMinimumSize(300, 300)
+    w.setWindowTitle("Measurement Window")
+
+    globals.greyR = globals.greyR_init
+    globals.greyR_display = f"{max(globals.greyR + globals.greyR_offset, 0):3d}"
+
+    color = ColorRGB(-5)
+    w.setStyleSheet(f"background-color: {color};")
+
+    w.show()
+    return w
+
+
+def iOneInit(mode: str):
+    globals.ioneInit = 0
+
+    if mode == "lum":
+        cmd = [f"{globals.binpath}/spotread.exe", "-u", "-e", "-y", globals.i1yval, "-O"]
+    elif mode == "lux":
+        cmd = [f"{globals.binpath}/spotread.exe", "-u", "-a", "-O"]
+    else:
+        print("Error: iOneInit requires a mode of lum or lux")
+        globals.srMode = 0
+        return 0
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        stdout, stderr = proc.communicate(timeout=10)
+        globals.srid = proc.pid
+        print("pid:", globals.srid)
+
+        # simulate Tcl string check
+        if "Result is" in stdout:
+            globals.meterStatus = 1
+        else:
+            globals.meterStatus = 0
+
+        if globals.meterStatus == 1:
+            globals.ioneInit = 1
+            print("Photometer initialized correctly.")
+            globals.srMode = mode
+            return 1
+        else:
+            print("Error: Photometer failed to initialize.")
+            globals.srMode = 0
+            return 0
+
+    except Exception as e:
+        print("Error:", e)
+        return 0
+
+
+def initIL():
+    if globals.LUTmode == 0:
+        return
+
+    if globals.meter == "i1DisplayPro":
+        globals.i1yval = "n"
+
+        if iOneInit("lum") != 1:
+            QMessageBox.critical(
+                None,
+                "FATAL ERROR",
+                "Error initializing i1Display"
+            )
+            return 0
+    else:
+        QMessageBox.critical(
+            None,
+            "Photometer Error",
+            "Undefined Photometer type in LRconfig.txt"
+        )
+
+    return 1
+
+
+def il_init():
+    if globals.record == 1:
+        QMessageBox.critical(None, "Error", "Data acquisition must be stopped before re-initializing.")
+        return
+
+    # Confirm photometer connection
+    answer = QMessageBox.question(
+        None,
+        "Confirm Connection",
+        f"Is the {globals.meter} Photometer connected and positioned in the black square?",
+        QMessageBox.Yes | QMessageBox.No
+    )
+
+    if answer == QMessageBox.Yes:
+        globals.ILstatus = 1
+        globals.ILval = 0.00
+        globals.ILavg = 0.00
+        globals.ILcnt = globals.avgN + 2
+        globals.ILautoNum = 0
+
+        if initIL() == 0:
+            QMessageBox.critical(None, "Meter Error", "ERROR: Meter did not initialize")
+            globals.ILstatus = 0
+            return
+
+        # Set label colors in the lumMeter panel
+        try:
+            globals.lumMeter.avg.setStyleSheet(f"color: {globals.fgClr}")
+            globals.lumMeter.gmajor.setStyleSheet(f"color: {globals.fgClr}")
+            globals.lumMeter.gminor.setStyleSheet(f"color: {globals.fgClr}")
+        except AttributeError:
+            print("Warning: lumMeter GUI elements not set in globals")
+
+    else:
+        return
+
+    globals.ILdataReady = 0
+    globals.ILfilt = 0
+    globals.lastILavg = 0
+
+
+from PySide6.QtCore import QEventLoop, QTimer
+
+
+def delay(ms: int):
+    loop = QEventLoop()
+    QTimer.singleShot(ms, loop.quit)
+    loop.exec()
+
+
+def ILoutlierTest():
+    if globals.greyR == 0 and globals.LUTphase == 0:
+        globals.relChange = 0
+        globals.absChange = 0
+        mabsChange = 0
+    else:
+        globals.absChange = globals.ILavg - globals.lastILavg
+        mabsChange = abs(globals.absChange)
+        avg = (globals.ILavg + globals.lastILavg) / 2.0
+        globals.relChange = globals.absChange / avg if avg != 0 else 0
+
+    # Check if inside acceptable limits
+    if (
+            mabsChange <= globals.ILlimit_abs or
+            (globals.ILlimit_minus <= globals.relChange <= globals.ILlimit_plus)
+    ):
+        if globals.outlierTestCount != 0:
+            globals.outlierResolve += 1
+            globals.outlierTestCount = 0
+        return 0  # no outlier
+    else:
+        globals.outlierTestCount += 1
+
+        if globals.outlierTestCount == 1:
+            globals.outlierTotal += 1
+            marker = "**"
+        else:
+            marker = "*"
+
+        textmsg = f"  {int(globals.greyR_display):4d}   {globals.LUTphase_display}"
+        textmsg += f"     {globals.ILavg:7.3f}  {globals.lastRGB}   {globals.lastILavg:7.3f}"
+        textmsg += f"    {globals.relChange:1.4f} {globals.absChange:1.4f} {marker}"
+
+        print(textmsg)
+        if globals.log and hasattr(globals.log, "write"):
+            globals.log.write(textmsg + "\n")
+
+        if globals.outlierTestCount < globals.outlierNum:
+            return 1  # retry
+
+        # Final check with tolerance limits
+        tolerance_abs = globals.ILlimit_abs * globals.ILtolerance
+        tolerance_plus = globals.ILlimit_plus * globals.ILtolerance
+        tolerance_minus = globals.ILlimit_minus * globals.ILtolerance
+
+        if (
+                mabsChange <= tolerance_abs or
+                (tolerance_minus <= globals.relChange <= tolerance_plus)
+        ):
+            globals.outlierAccept += 1
+            msg = "WARNING: Too many outliers. Outlier value accepted by tolerance limit."
+            print(msg)
+            if globals.log and hasattr(globals.log, "write"):
+                globals.log.write(msg + "\n")
+            return 0  # accept outlier
+        else:
+            globals.pause_flag = 1
+            detail = (
+                "Persistent outlier detected.\n\nCurrent values:\n"
+                f"  ILavg     = {globals.ILavg:.3f}\n"
+                f"  lastRGB   = {globals.lastRGB}\n"
+                f"  lastILavg = {globals.lastILavg:.3f}\n"
+                f"  relChange = {globals.relChange:.4f}\n"
+                f"  absChange = {globals.absChange:.4f}\n\n"
+                "Do you wish to accept the outlier value?"
+            )
+            answer = QMessageBox.question(
+                None, "Outlier Detected", detail,
+                QMessageBox.Yes | QMessageBox.No
+            )
+
+            if answer == QMessageBox.Yes:
+                globals.outlierAccept += 1
+                msg = "WARNING: Too many outliers. Outlier value accepted by user."
+                print(msg)
+                if globals.log and hasattr(globals.log, "write"):
+                    globals.log.write(msg + "\n")
+                globals.pause_flag = 0
+                return 0
+            else:
+                globals.error = 1
+                msg = "ERROR: Too many outliers. Measurement aborted by user."
+                print(msg)
+                if globals.log and hasattr(globals.log, "write"):
+                    globals.log.write(msg + "\n")
+                globals.pause_flag = 0
+                return 1
+
+
+def iOneRead():
+    if globals.srMode == "lum":
+        sropt = "-e"
+    elif globals.srMode == "lux":
+        sropt = "-a"
+    else:
+        sropt = ""
+
+    cmd = [
+        f"{globals.binpath}/spotread.exe",
+        "-u", sropt,
+        "-y", globals.i1yval,
+        "-O"
+    ]
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        globals.srid = proc.pid
+        stdout, stderr = proc.communicate(timeout=10)
+        globals.srout = stdout.strip()
+        globals.iOneDone = True
+        return 1
+
+    except Exception as e:
+        print("Error:", e)
+        return 0
+
+
+def iOneCall():
+    for i in range(globals.avgN):
+        if iOneRead() != 1:
+            QMessageBox.critical(
+                None,
+                "FATAL ERROR",
+                "Error: i1Display read utility"
+            )
+            return 0
+    return 1
+
+
+def Next_greyR(w, change):
+    if globals.start == 0:
+        globals.test_window = Initialize()
+
+    if globals.greyR >= 0:
+        globals.greyR += change
+    else:
+        globals.greyR += 1
+
+    if globals.greyR > 255:
+        globals.greyR = 255
+
+    globals.greyR_display = f"{max(globals.greyR + globals.greyR_offset, 0):3d}"
+    if int(globals.greyR_display) > 255 + globals.greyR_offset:
+        globals.greyR_display = str(255 + globals.greyR_offset)
+
+    try:
+        color = QColor(ColorRGB(globals.greyR))
+        if hasattr(w, "rect_item"):
+            w.rect_item.setBrush(QBrush(color))
+            w.rect_item.setPen(QPen(color))
+    except Exception as e:
+        print("Next_greyR error:", e)
+
+
+def IL_auto(w):
+    globals.error = 0
+
+    # reset outlier indicator (placeholder for GUI logic)
+    # try:
+    #     globals.lumMeter.outlier.setStyleSheet(f"color: {globals.bgClr}")
+    # except AttributeError:
+    #     pass  # will hook GUI later
+
+    # LUTmode-specific setup
+    if globals.LUTmode != 0:
+        base_path = Path.cwd()
+        input_path = ""
+
+        if globals.LUTmode == 1786:
+            input_path = base_path / "1786phase.txt"
+        elif globals.LUTmode == 766:
+            input_path = base_path / "766phase.txt"
+        elif globals.LUTmode == 256:
+            input_path = base_path / "256phase.txt"
+        elif globals.LUTmode == 52:
+            input_path = base_path / "256phase.txt"
+            globals.dGrey = 5
+        elif globals.LUTmode == 18:
+            input_path = base_path / "256phase.txt"
+            globals.dGrey = 15
+        elif globals.LUTmode == 16:
+            input_path = base_path / "16phase.txt"
+            globals.dGrey = 16
+        elif globals.LUTmode == 1:
+            answer = QMessageBox.question(
+                None,
+                "Phase File",
+                globals.msgOther,
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if answer == QMessageBox.Yes:
+                path = QFileDialog.getOpenFileName(None, "Select PHASE file")[0]
+                if not path:
+                    return
+                input_path = Path(path)
+            else:
+                return
+
+        try:
+            with open(input_path, "r") as f:
+                f.readline()  # skip header
+                f.readline()
+                globals.numPhases = int(f.readline().strip())
+                for i in range(globals.numPhases):
+                    line = f.readline()
+                    if not line:
+                        QMessageBox.critical(None, "Error", "Incorrect number of lines in phase file")
+                        return
+                    globals.phase[i] = line.strip()
+                tail = f.readline()
+                if tail:
+                    QMessageBox.critical(None, "Error", "Extra lines in phase file")
+                    return
+        except Exception as e:
+            QMessageBox.critical(None, "File Error", f"Cannot open {input_path}\n{e}")
+            return
+
+    if globals.start == 0:
+        Initialize(w)
+
+    # set initial grey level
+    globals.greyR = globals.greyR_init
+    globals.greyR_display = f"{max(globals.greyR + globals.greyR_offset, 0):3d}"
+
+    # update canvas rectangle color
+    try:
+        canvas = w.findChild(type(w), "canvas")  # placeholder: replace with actual ref
+        color = ColorRGB(globals.greyR)
+        canvas.setStyleSheet(f"background-color: {color}")  # placeholder for actual item update
+    except Exception:
+        pass
+
+    # open log file
+    try:
+        globals.log = open(globals.logfile, "w")
+    except Exception as e:
+        QMessageBox.critical(None, "Log Error", f"Cannot open logfile: {e}")
+        return
+
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%D %T")
+
+    header = f"# Photometer filter log - {timestamp}"
+    globals.log.write(header + "\n")
+    print(header)
+
+    subheader = "# Major Minor   ILavg   lastRGB  lastILavg  relChange  absChange"
+    globals.log.write(subheader + "\n")
+    print(subheader)
+
+    if globals.ILstatus != 0:
+        globals.ILautoNum = 0
+        globals.lastILavg = 0
+        globals.outlierTestCount = 0
+        globals.outlierTotal = 0
+        globals.outlierResolve = 0
+        globals.outlierAccept = 0
+        globals.relChange = 0
+        globals.absChange = 0
+
+        if globals.LUTmode != 0:
+            while globals.greyR < 256:
+                for globals.LUTphase in range(globals.numPhases):
+                    if globals.greyR >= 0:
+                        Next_greyR(w, +0)
+
+                    if globals.greyR <= 0 and globals.LUTphase == 0:
+                        delay(1000)
+                        if globals.greyR == 0 and globals.LUTmode not in (16, 18, 52):
+                            globals.ILfilt = 1
+
+                    globals.ILcnt = 1 - globals.iLdelay
+                    globals.ILavg = 0.0
+                    globals.CHRuAvg = 0.0
+                    globals.CHRvAvg = 0.0
+
+                    delay(100)  # let display stabilize
+                    iOneCall()  # blocking until valid reading is ready
+
+                    if globals.error != 0 or globals.record == 0:
+                        break
+
+                    # Store luminance
+                    globals.autoLumVal[globals.ILautoNum] = globals.ILavg
+                    globals.autoLumRGB[globals.ILautoNum] = globals.lastRGB
+                    globals.ILavg_display = f"{globals.ILavg:.3f}"
+
+                    # Store chrominance
+                    globals.autoCHRuVal[globals.ILautoNum] = globals.CHRuAvg
+                    globals.autoCHRvVal[globals.ILautoNum] = globals.CHRvAvg
+
+                    # Update display strings
+                    globals.greyR_display = f"{max(globals.greyR + globals.greyR_offset, 0):3d}"
+                    globals.LUTphase_display = str(globals.LUTphase + 1)
+
+                    # Check for outlier
+                    if globals.ILfilt != 0 and ILoutlierTest() != 0:
+                        if globals.error != 0:
+                            break
+                        try:
+                            globals.lumMeter.outlier.setStyleSheet(f"color: {globals.fgClr}")
+                        except AttributeError:
+                            pass
+                        delay(globals.outlierpause)
+                        globals.ILautoNum -= 1
+                        globals.LUTphase -= 1
+                        continue
+                    else:
+                        try:
+                            globals.lumMeter.outlier.setStyleSheet(f"color: {globals.bgClr}")
+                        except AttributeError:
+                            pass
+
+                        if globals.ILfilt != 0:
+                            globals.lastILavg = globals.ILavg
+
+                        textmsg = f"  {int(globals.greyR_display):4d}   {globals.LUTphase_display}"
+                        textmsg += f"     {globals.ILavg:7.3f}  {globals.lastRGB}   {globals.lastILavg:7.3f}"
+                        if globals.ILfilt != 0:
+                            textmsg += f"    {globals.relChange:1.4f} {globals.absChange:1.4f}"
+
+                        print(textmsg)
+                        globals.log.write(textmsg + "\n")
+
+                    if globals.greyR == 255 or globals.greyR < 0:
+                        break
+
+                if globals.error != 0 or globals.record == 0:
+                    break
+
+                globals.LUTphase = 0
+                if globals.greyR == 255:
+                    break
+
+                Next_greyR(w, globals.dGrey)
+                QApplication.processEvents()
+
+    else:  # demo mode
+        globals.avgN = 2
+        globals.iLdelay = 2
+        globals.dGrey = 15
+        globals.numPhases = 1
+
+        while globals.greyR < 256:
+            globals.ILavg = float(globals.greyR) if globals.greyR >= 0 else 0.0
+            globals.CHRuAvg = 0.3127
+            globals.CHRvAvg = 0.3290
+
+            delay(1000)
+            globals.ILautoNum += 1
+
+            globals.autoLumVal[globals.ILautoNum] = globals.ILavg
+            globals.autoLumRGB[globals.ILautoNum] = globals.lastRGB
+            globals.ILavg_display = f"{globals.ILavg:.3f}"
+            globals.autoCHRuVal[globals.ILautoNum] = globals.CHRuAvg
+            globals.autoCHRvVal[globals.ILautoNum] = globals.CHRvAvg
+
+            globals.greyR_display = f"{max(globals.greyR + globals.greyR_offset, 0):3d}"
+
+            if globals.greyR == 255 or globals.record == 0:
+                break
+
+            Next_greyR(w, globals.dGrey)
+
+        globals.dGrey = 1  # reset
+
+    # After loop – wrap up
+    globals.ILfilt = 0
+
+    try:
+        color = ColorRGB(0)
+        canvas = w.findChild(type(w), "canvas")  # placeholder
+        canvas.setStyleSheet(f"background-color: {color}")
+    except Exception:
+        pass
+
+    globals.greyR = 0
+    globals.greyR_display = f"{max(globals.greyR + globals.greyR_offset, 0):3d}"
+
+    if globals.error != 0:
+        QMessageBox.critical(None, "Error", "ERROR - See log file for details.")
+        return
+    else:
+        print("Measurement complete.")
+
+    try:
+        globals.log.close()
+    except Exception:
+        pass
+    globals.log = None
+
+    if globals.record == 0:
+        return
+
+    globals.ILdataReady = 1
+
+    textmsg = (
+        "Luminance Measurement Complete\n\n"
+        f"Number of outliers = {globals.outlierTotal}\n"
+        f"Resolved outliers  = {globals.outlierResolve}\n"
+        f"Accepted outliers  = {globals.outlierAccept}\n\n"
+        "SAVE RESULTS BEFORE CHANGING SETTINGS\n\n"
+        "Would you like to view the log file?"
+    )
+
+    answer = QMessageBox.question(
+        None, "View Log File?", textmsg,
+        QMessageBox.Yes | QMessageBox.No
+    )
+
+    if answer == QMessageBox.Yes:
+        try:
+            subprocess.Popen(["notepad", globals.logfile])
+        except Exception as e:
+            QMessageBox.warning(
+                None, "WARNING",
+                f"Error opening logfile with notepad\n{e}"
+            )
+
+
+def IL_rec(w, btn_rec):
+    if globals.ILstatus == 0:
+        QMessageBox.critical(None, "Error", "Meter has not been initialized.")
+        return
+
+    if globals.record == 0:
+        textmsg = (
+            "Beginning luminance measurement.\n\n"
+            "Please check the following:\n\n"
+            "1 - Assert LINEAR LUT (1786 or 766 Mode)\n"
+            "    Assert DICOM LUT (256, 52, 18, 16x2 QC Mode)\n\n"
+            "2 - Ambient lighting should be minimized\n\n"
+            "3 - Turn off screensavers (set to \"None\")\n"
+            "    Turn off power-saving (set to \"Never\")\n\n"
+            "Start measurement?"
+        )
+
+        answer = QMessageBox.question(
+            None,
+            "Start Measurement",
+            textmsg,
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if answer == QMessageBox.Yes:
+            globals.record = 1
+            btn_rec.setText("STOP")
+            IL_auto(w)
+        else:
+            return
+
+    else:
+        answer = QMessageBox.question(
+            None,
+            "Cancel Operation",
+            "Do you wish to cancel the current operation?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if answer == QMessageBox.Yes:
+            globals.record = 0
+            textmsg = "Measurement aborted by user."
+            print(textmsg)
+            if globals.log and hasattr(globals.log, "write"):
+                globals.log.write(textmsg + "\n")
+        else:
+            return
+
+    globals.record = 0
+
+    try:
+        globals.rec_bar.auto.setText("RECORD")
+    except AttributeError:
+        print("Warning: rec_bar.auto button not assigned in globals.")
