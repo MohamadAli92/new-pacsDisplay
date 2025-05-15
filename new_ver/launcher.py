@@ -5,7 +5,9 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QLabel
 )
 
-from lumResponse import initialize, il_init, IL_rec
+from window_initializer import initialize
+from meter_initializer import il_init
+from recorder import IL_rec
 
 # List to keep window references
 opened_windows = []
