@@ -109,175 +109,12 @@
 
 import globals
 from pathlib import Path
+from window_initializer import initialize, color_rgb
 import subprocess
 
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QMessageBox, QFileDialog
+    QApplication, QMessageBox, QFileDialog
 )
-from PySide6.QtGui import QColor, QBrush, QPen
-
-
-def Color(grey):
-    red = f"{grey:02x}"
-    green = red
-    blue = red
-    return f"#{red}{green}{blue}"
-
-
-def ColorRGB(grey):
-    grey = max(0, min(grey, 255))
-
-    raw = globals.phase.get(globals.LUTphase, "0 0 0") if globals.LUTmode and grey < 255 else "0 0 0"
-
-    if isinstance(raw, str):
-        shift = [int(s) for s in raw.strip().split()]
-    else:
-        shift = list(raw)
-
-    r, g, b = [max(0, min(grey + int(s), 255)) for s in shift]
-
-
-    color = f"#{r:02x}{g:02x}{b:02x}"
-    globals.lastRGB = color
-    return color
-
-
-def SetRect(width, height, rectX, rectY):
-    globals.bb_llx = width // 2 - rectX // 2
-    globals.bb_lly = height // 2 - rectY // 2
-    globals.bb_urx = width // 2 + rectX // 2
-    globals.bb_ury = height // 2 + rectY // 2
-
-
-# ---------- Initialize with GUI ----------
-def initialize():
-
-    w = QWidget()
-    w.resize(400, 400)
-    w.setMinimumSize(300, 300)
-    w.setWindowTitle("Measurement Window")
-
-    globals.greyR = globals.greyR_init
-    globals.greyR_display = f"{max(globals.greyR + globals.greyR_offset, 0):3d}"
-
-    color = ColorRGB(-5)
-    w.setStyleSheet(f"background-color: {color};")
-
-    w.show()
-
-    globals.start = 1
-
-    return w
-
-
-def iOneInit(mode: str):
-    globals.ioneInit = 0
-
-    if mode == "lum":
-        cmd = [f"{globals.binpath}/spotread.exe", "-u", "-e", "-y", globals.i1yval, "-O"]
-    elif mode == "lux":
-        cmd = [f"{globals.binpath}/spotread.exe", "-u", "-a", "-O"]
-    else:
-        print("Error: iOneInit requires a mode of lum or lux")
-        globals.srMode = 0
-        return 0
-
-    try:
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        stdout, stderr = proc.communicate(timeout=10)
-        globals.srid = proc.pid
-        print("pid:", globals.srid)
-
-        # simulate Tcl string check
-        if "Result is" in stdout:
-            globals.meterStatus = 1
-        else:
-            globals.meterStatus = 0
-
-        if globals.meterStatus == 1:
-            globals.ioneInit = 1
-            print("Photometer initialized correctly.")
-            globals.srMode = mode
-            return 1
-        else:
-            print("Error: Photometer failed to initialize.")
-            globals.srMode = 0
-            return 0
-
-    except Exception as e:
-        print("Error:", e)
-        return 0
-
-
-def initIL():
-    if globals.LUTmode == 0:
-        return
-
-    if globals.meter == "i1DisplayPro":
-        globals.i1yval = "n"
-
-        if iOneInit("lum") != 1:
-            QMessageBox.critical(
-                None,
-                "FATAL ERROR",
-                "Error initializing i1Display"
-            )
-            return 0
-    else:
-        QMessageBox.critical(
-            None,
-            "Photometer Error",
-            "Undefined Photometer type in LRconfig.txt"
-        )
-
-    return 1
-
-
-def il_init():
-    if globals.record == 1:
-        QMessageBox.critical(None, "Error", "Data acquisition must be stopped before re-initializing.")
-        return
-
-    # Confirm photometer connection
-    answer = QMessageBox.question(
-        None,
-        "Confirm Connection",
-        f"Is the {globals.meter} Photometer connected and positioned in the black square?",
-        QMessageBox.Yes | QMessageBox.No
-    )
-
-    if answer == QMessageBox.Yes:
-        globals.ILstatus = 1
-        globals.ILval = 0.00
-        globals.ILavg = 0.00
-        globals.ILcnt = globals.avgN + 2
-        globals.ILautoNum = 0
-
-        if initIL() == 0:
-            QMessageBox.critical(None, "Meter Error", "ERROR: Meter did not initialize")
-            globals.ILstatus = 0
-            return
-
-        # Set label colors in the lumMeter panel
-        try:
-            globals.lumMeter.avg.setStyleSheet(f"color: {globals.fgClr}")
-            globals.lumMeter.gmajor.setStyleSheet(f"color: {globals.fgClr}")
-            globals.lumMeter.gminor.setStyleSheet(f"color: {globals.fgClr}")
-        except AttributeError:
-            print("Warning: lumMeter GUI elements not set in globals")
-
-    else:
-        return
-
-    globals.ILdataReady = 0
-    globals.ILfilt = 0
-    globals.lastILavg = 0
-
 
 from PySide6.QtCore import QEventLoop, QTimer
 
@@ -439,7 +276,7 @@ def Next_greyR(w, change):
         globals.greyR_display = str(255 + globals.greyR_offset)
 
     try:
-        color = ColorRGB(globals.greyR)
+        color = color_rgb(globals.greyR)
         w.setStyleSheet(f"background-color: {color};")
     except Exception as e:
         print("Next_greyR error:", e)
@@ -661,7 +498,7 @@ def IL_auto(w):
     globals.ILfilt = 0
 
     try:
-        color = ColorRGB(0)
+        color = color_rgb(0)
         canvas = w.findChild(type(w), "canvas")  # placeholder
         canvas.setStyleSheet(f"background-color: {color}")
     except Exception:
