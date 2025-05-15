@@ -1,12 +1,11 @@
 import sys
+import globals
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton,
     QVBoxLayout, QLabel
 )
 
 from lumResponse import initialize, il_init, IL_rec
-
-test_window = None  # global-level reference to the .lum window
 
 # List to keep window references
 opened_windows = []
@@ -21,8 +20,7 @@ layout.addWidget(QLabel("Launcher Panel"))
 
 # Button 1: Initialize
 def handle_initialize():
-    global test_window
-    test_window = initialize()
+    globals.test_window = initialize()
 
 btn_init = QPushButton("Initialize")
 btn_init.clicked.connect(lambda: handle_initialize())
@@ -38,7 +36,7 @@ from PySide6.QtWidgets import QHBoxLayout
 # Button 3: Init record
 
 btn_rec = QPushButton("RECORD")
-btn_rec.clicked.connect(lambda: IL_rec(test_window, btn_rec))
+btn_rec.clicked.connect(lambda: IL_rec(globals.test_window, btn_rec))
 layout.addWidget(btn_rec)
 
 # Button 4: Empty

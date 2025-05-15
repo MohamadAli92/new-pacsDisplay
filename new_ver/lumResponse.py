@@ -107,17 +107,14 @@
 #     win = InitializeGUI()
 #     sys.exit(app.exec())
 
-import sys
 import globals
 from pathlib import Path
 import subprocess
 
 from PySide6.QtWidgets import (
-    QApplication, QWidget, QGraphicsView, QGraphicsScene,
-    QGraphicsRectItem, QVBoxLayout, QMessageBox, QFileDialog
+    QApplication, QWidget, QMessageBox, QFileDialog
 )
 from PySide6.QtGui import QColor, QBrush, QPen
-from PySide6.QtCore import QRectF, Qt
 
 
 def Color(grey):
@@ -130,13 +127,15 @@ def Color(grey):
 def ColorRGB(grey):
     grey = max(0, min(grey, 255))
 
-    if globals.LUTmode and grey < 255:
-        shift = globals.phase.get(globals.LUTphase, [0, 0, 0])
-        r = max(0, min(grey + shift[0], 255))
-        g = max(0, min(grey + shift[1], 255))
-        b = max(0, min(grey + shift[2], 255))
+    raw = globals.phase.get(globals.LUTphase, "0 0 0") if globals.LUTmode and grey < 255 else "0 0 0"
+
+    if isinstance(raw, str):
+        shift = [int(s) for s in raw.strip().split()]
     else:
-        r = g = b = grey
+        shift = list(raw)
+
+    r, g, b = [max(0, min(grey + int(s), 255)) for s in shift]
+
 
     color = f"#{r:02x}{g:02x}{b:02x}"
     globals.lastRGB = color
@@ -165,6 +164,9 @@ def initialize():
     w.setStyleSheet(f"background-color: {color};")
 
     w.show()
+
+    globals.start = 1
+
     return w
 
 
@@ -422,7 +424,7 @@ def iOneCall():
 
 def Next_greyR(w, change):
     if globals.start == 0:
-        globals.test_window = Initialize()
+        globals.test_window = initialize()
 
     if globals.greyR >= 0:
         globals.greyR += change
@@ -437,10 +439,8 @@ def Next_greyR(w, change):
         globals.greyR_display = str(255 + globals.greyR_offset)
 
     try:
-        color = QColor(ColorRGB(globals.greyR))
-        if hasattr(w, "rect_item"):
-            w.rect_item.setBrush(QBrush(color))
-            w.rect_item.setPen(QPen(color))
+        color = ColorRGB(globals.greyR)
+        w.setStyleSheet(f"background-color: {color};")
     except Exception as e:
         print("Next_greyR error:", e)
 
@@ -509,19 +509,19 @@ def IL_auto(w):
             return
 
     if globals.start == 0:
-        Initialize(w)
+        globals.test_window = initialize()
 
-    # set initial grey level
-    globals.greyR = globals.greyR_init
-    globals.greyR_display = f"{max(globals.greyR + globals.greyR_offset, 0):3d}"
+    # # set initial grey level
+    # globals.greyR = globals.greyR_init
+    # globals.greyR_display = f"{max(globals.greyR + globals.greyR_offset, 0):3d}"
 
     # update canvas rectangle color
-    try:
-        canvas = w.findChild(type(w), "canvas")  # placeholder: replace with actual ref
-        color = ColorRGB(globals.greyR)
-        canvas.setStyleSheet(f"background-color: {color}")  # placeholder for actual item update
-    except Exception:
-        pass
+    # try:
+    #     canvas = w.findChild(type(w), "canvas")  # placeholder: replace with actual ref
+    #     color = ColorRGB(globals.greyR)
+    #     canvas.setStyleSheet(f"background-color: {color}")  # placeholder for actual item update
+    # except Exception:
+    #     pass
 
     # open log file
     try:

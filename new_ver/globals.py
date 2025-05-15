@@ -3,6 +3,7 @@ phase = {
 }
 LUTphase = 0
 lastRGB = ""
+test_window = None
 
 bb_llx = 0
 bb_lly = 0
