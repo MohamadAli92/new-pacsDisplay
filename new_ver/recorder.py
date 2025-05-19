@@ -9,6 +9,56 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtCore import QEventLoop, QTimer
 
+def iOneQuit():
+    globals.meterStatus = 0
+
+def iOneParse():
+
+    s = globals.srout
+    if "XYZ" not in s:
+        print("Error: no XYZ found in ioneReading input string")
+        return 0
+
+    try:
+        start = s.find("XYZ")
+        if start == -1:
+            print("Error: no XYZ found")
+            return 0
+
+        end = s.find("\n", start)
+        if end == -1:
+            end = len(s)
+
+        line = s[start:end].strip()
+        parts = line.split()
+        globals.ioneReading = line
+        globals.ioneY = float(parts[5])
+        globals.ioneu = float(parts[6])
+        globals.ionev = float(parts[7])
+    except Exception as e:
+        print("Error parsing XYZ line:", e)
+        return 0
+
+    if globals.srMode == "lum":
+        return globals.ioneY
+
+    elif globals.srMode == "lux":
+        try:
+            start = s.index("Ambient =")
+            end = s.index("\n", start)
+            line = s[start:end].strip()
+            parts = line.split()
+            globals.ioneReading = line
+            globals.ioneLux = float(parts[2])
+            return globals.ioneLux
+        except Exception as e:
+            print("Error parsing Ambient line:", e)
+            return 0
+
+    else:
+        print("Error: srMode must be lum or lux")
+        return 0
+
 
 def delay(ms: int):
     loop = QEventLoop()
@@ -104,6 +154,77 @@ def ILoutlierTest():
                 globals.pause_flag = 0
                 return 1
 
+def nit(lum: float):
+    if globals.meter == "i1DisplayPro":
+        globals.ILval = lum
+        globals.ILval *= globals.iLcalVal
+        globals.ILval_display = f"{globals.ILval:8.3f}"
+
+        CHRu = globals.ioneu
+        CHRv = globals.ionev
+    else:
+        QMessageBox.critical(None, "Error", "Undefined Photometer type in LRconfig.txt")
+        return
+
+    if globals.pause_flag != 0:
+        return
+
+    if globals.verboselog == 1 and globals.log is not None:
+        log_line = (
+            f"{int(globals.greyR_display):4d}   {globals.LUTphase_display}"
+            f"      {globals.ILval:7.3f}  {globals.lastRGB}  {globals.lastILavg:7.3f} -IL1700"
+        )
+        globals.log.write(log_line + "\n")
+
+    if globals.avgN >= 1:
+        if globals.ILcnt <= globals.avgN:
+
+            if 1 <= globals.ILcnt <= globals.avgN:
+                globals.ILavg += globals.ILval
+                globals.CHRuAvg += CHRu
+                globals.CHRvAvg += CHRv
+
+            if globals.ILcnt == globals.avgN:
+                globals.ILavg /= globals.avgN
+                globals.CHRuAvg /= globals.avgN
+                globals.CHRvAvg /= globals.avgN
+                globals.ILautoNum += 1
+
+            globals.ILcnt += 1
+
+    QApplication.processEvents()
+
+def iOneCheck(output: str):
+    globals.iOneDone = 0
+    srtemp = output.strip()
+
+    while globals.iOneDone != 1:
+        if "XYZ" not in srtemp:
+            if "failed" in srtemp or "hid" in srtemp:
+                try:
+                    import subprocess
+                    subprocess.run(["taskkill", "/PID", str(globals.srid), "/F"], check=True)
+                except Exception as e:
+                    print("Error killing spotread:", e)
+
+                iOneQuit()
+                QMessageBox.critical(
+                    None,
+                    "FATAL ERROR",
+                    "Check ambient light cover position and try again"
+                )
+                globals.iOneCover = 1
+                return
+            else:
+                globals.iOneCover = 1
+                return
+        else:
+            globals.iOneCover = 0
+            globals.srout = srtemp
+            parsed = iOneParse()
+            nit(parsed)
+            globals.iOneDone = 1
+
 
 def iOneRead():
     if globals.srMode == "lum":
@@ -129,7 +250,10 @@ def iOneRead():
         )
         globals.srid = proc.pid
         stdout, stderr = proc.communicate(timeout=10)
-        globals.srout = stdout.strip()
+        output = stdout.strip()
+
+        iOneCheck(output)
+
         globals.iOneDone = True
         return 1
 
