@@ -4,7 +4,6 @@ import globals
 import subprocess
 
 def i_one_init(mode: str):
-    globals.ioneInit = 0
 
     if mode == "lum":
         cmd = [f"{globals.binpath}/spotread.exe", "-u", "-e", "-y", globals.i1yval, "-O"]
@@ -33,7 +32,6 @@ def i_one_init(mode: str):
             globals.meterStatus = 0
 
         if globals.meterStatus == 1:
-            globals.ioneInit = 1
             print("Photometer initialized correctly.")
             globals.srMode = mode
             return 1
@@ -97,9 +95,9 @@ def il_init():
 
         # Set label colors in the lumMeter panel
         try:
-            globals.lumMeter.avg.setStyleSheet(f"color: {globals.fgClr}")
-            globals.lumMeter.gmajor.setStyleSheet(f"color: {globals.fgClr}")
-            globals.lumMeter.gminor.setStyleSheet(f"color: {globals.fgClr}")
+            globals.lumMeter.avg.setStyleSheet("color: #00ff00")
+            globals.lumMeter.gmajor.setStyleSheet("color: #00ff00")
+            globals.lumMeter.gminor.setStyleSheet("color: #00ff00")
         except AttributeError:
             print("Warning: lumMeter GUI elements not set in globals")
 

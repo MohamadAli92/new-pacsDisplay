@@ -28,7 +28,7 @@ def initialize():
     w.setMinimumSize(300, 300)
     w.setWindowTitle("Measurement Window")
 
-    globals.greyR = globals.greyR_init
+    globals.greyR = 0
     globals.greyR_display = f"{max(globals.greyR + globals.greyR_offset, 0):3d}"
 
     color = color_rgb(-5)
