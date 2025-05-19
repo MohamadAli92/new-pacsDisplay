@@ -3,12 +3,11 @@ record = 0
 ILval = 0.0
 lumMeter = None
 LUTmode = 18  # 0 means demo mode
-ILstatus = 0
-ILcnt = 0
-ILdataReady = 0
+ILstatus = 0 # start with the IL status at off
+ILcnt = 0 #initial value skips averaging section
 
 ILfilt = 0
-phase = {}
+phase = {0: "0	0	0"}
 
 start = 0
 

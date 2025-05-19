@@ -11,9 +11,6 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtCore import QEventLoop, QTimer
 
-def iOneQuit():
-    globals.meterStatus = 0
-
 def iOneParse():
     ioneY = 0.0
     ioneLux = 0.0
@@ -61,12 +58,10 @@ def iOneParse():
         print("Error: srMode must be lum or lux")
         return 0
 
-
 def delay(ms: int):
     loop = QEventLoop()
     QTimer.singleShot(ms, loop.quit)
     loop.exec()
-
 
 def ILoutlierTest():
     if globals.greyR == 0 and globals.LUTphase == 0:
@@ -212,7 +207,8 @@ def iOneCheck(output: str):
                 except Exception as e:
                     print("Error killing spotread:", e)
 
-                iOneQuit()
+                globals.meterStatus = 0
+
                 QMessageBox.critical(
                     None,
                     "FATAL ERROR",
@@ -229,7 +225,6 @@ def iOneCheck(output: str):
             parsed = iOneParse()
             nit(parsed)
             globals.iOneDone = 1
-
 
 def iOneRead():
     if globals.srMode == "lum":
@@ -266,7 +261,6 @@ def iOneRead():
         print("Error:", e)
         return 0
 
-
 def iOneCall():
     for i in range(globals.avgN):
         if iOneRead() != 1:
@@ -277,7 +271,6 @@ def iOneCall():
             )
             return 0
     return 1
-
 
 def Next_greyR(w, change):
     if globals.start == 0:
@@ -300,7 +293,6 @@ def Next_greyR(w, change):
         w.setStyleSheet(f"background-color: {color};")
     except Exception as e:
         print("Next_greyR error:", e)
-
 
 def IL_auto(w):
     num_phases = 0
@@ -548,8 +540,6 @@ def IL_auto(w):
     if globals.record == 0:
         return
 
-    globals.ILdataReady = 1
-
     textmsg = (
         "Luminance Measurement Complete\n\n"
         f"Number of outliers = {globals.outlierTotal}\n"
@@ -573,14 +563,13 @@ def IL_auto(w):
                 f"Error opening logfile with notepad\n{e}"
             )
 
-
 def IL_rec(w, btn_rec):
     if globals.ILstatus == 0:
         QMessageBox.critical(None, "Error", "Meter has not been initialized.")
         return
 
     if globals.record == 0:
-        textmsg = (
+        prompt = (
             "Beginning luminance measurement.\n\n"
             "Please check the following:\n\n"
             "1 - Assert LINEAR LUT (1786 or 766 Mode)\n"
@@ -590,41 +579,22 @@ def IL_rec(w, btn_rec):
             "    Turn off power-saving (set to \"Never\")\n\n"
             "Start measurement?"
         )
+        title = "Start Measurement"
 
-        answer = QMessageBox.question(
-            None,
-            "Start Measurement",
-            textmsg,
-            QMessageBox.Yes | QMessageBox.No
-        )
+    else:
+        prompt = "Do you wish to cancel the current operation?"
+        title = "Cancel Operation"
 
-        if answer == QMessageBox.Yes:
+    answer = QMessageBox.question(None, title, prompt, QMessageBox.Yes | QMessageBox.No)
+
+    if answer == QMessageBox.Yes:
+        if globals.record == 0:
             globals.record = 1
             btn_rec.setText("STOP")
             IL_auto(w)
         else:
-            return
-
-    else:
-        answer = QMessageBox.question(
-            None,
-            "Cancel Operation",
-            "Do you wish to cancel the current operation?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-
-        if answer == QMessageBox.Yes:
             globals.record = 0
-            textmsg = "Measurement aborted by user."
-            print(textmsg)
+            print("Measurement aborted by user.")
             if globals.log and hasattr(globals.log, "write"):
-                globals.log.write(textmsg + "\n")
-        else:
-            return
-
-    globals.record = 0
-
-    try:
-        globals.rec_bar.auto.setText("RECORD")
-    except AttributeError:
-        print("Warning: rec_bar.auto button not assigned in globals.")
+                globals.log.write("Measurement aborted by user.\n")
+            btn_rec.setText("RECORD")
