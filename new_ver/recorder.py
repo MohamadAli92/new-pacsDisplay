@@ -12,9 +12,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QEventLoop, QTimer
 
 def iOneParse():
-    ioneY = 0.0
-    ioneLux = 0.0
-
     s = globals.srout
     if "XYZ" not in s:
         print("Error: no XYZ found in ioneReading input string")
@@ -32,7 +29,7 @@ def iOneParse():
 
         line = s[start:end].strip()
         parts = line.split()
-        ioneY = float(parts[5])
+        globals.ioneY = float(parts[5])
         globals.ioneu = float(parts[6])
         globals.ionev = float(parts[7])
     except Exception as e:
@@ -40,7 +37,7 @@ def iOneParse():
         return 0
 
     if globals.srMode == "lum":
-        return ioneY
+        return globals.ioneY
 
     elif globals.srMode == "lux":
         try:
@@ -48,8 +45,8 @@ def iOneParse():
             end = s.index("\n", start)
             line = s[start:end].strip()
             parts = line.split()
-            ioneLux = float(parts[2])
-            return ioneLux
+            globals.ioneLux = float(parts[2])
+            return globals.ioneLux
         except Exception as e:
             print("Error parsing Ambient line:", e)
             return 0
@@ -152,12 +149,9 @@ def ILoutlierTest():
                 return 1
 
 def nit(lum: float):
-    iLcalVal = 1.0
-    verboselog = 0
-
     if globals.meter == "i1DisplayPro":
         globals.ILval = lum
-        globals.ILval *= iLcalVal
+        globals.ILval *= globals.iLcalVal
         globals.ILval_display = f"{globals.ILval:8.3f}"
 
         CHRu = globals.ioneu
@@ -169,7 +163,7 @@ def nit(lum: float):
     if globals.pause_flag != 0:
         return
 
-    if verboselog == 1 and globals.log is not None:
+    if globals.verboselog == 1 and globals.log is not None:
         log_line = (
             f"{int(globals.greyR_display):4d}   {globals.LUTphase_display}"
             f"      {globals.ILval:7.3f}  {globals.lastRGB}  {globals.lastILavg:7.3f} -IL1700"
@@ -295,14 +289,6 @@ def Next_greyR(w, change):
         print("Next_greyR error:", e)
 
 def IL_auto(w):
-    num_phases = 0
-    iLdelay = 2
-    autoLumRGB = {}
-    dGrey = 1
-    autoCHRuVal = {}
-    autoCHRvVal = {}
-    autoLumVal = {}
-
     globals.error = 0
 
     # reset outlier indicator (placeholder for GUI logic)
@@ -324,13 +310,13 @@ def IL_auto(w):
             input_path = base_path / "256phase.txt"
         elif globals.LUTmode == 52:
             input_path = base_path / "256phase.txt"
-            dGrey = 5
+            globals.dGrey = 5
         elif globals.LUTmode == 18:
             input_path = base_path / "256phase.txt"
-            dGrey = 15
+            globals.dGrey = 15
         elif globals.LUTmode == 16:
             input_path = base_path / "16phase.txt"
-            dGrey = 16
+            globals.dGrey = 16
         elif globals.LUTmode == 1:
             answer = QMessageBox.question(
                 None,
@@ -350,8 +336,8 @@ def IL_auto(w):
             with open(input_path, "r") as f:
                 f.readline()  # skip header
                 f.readline()
-                num_phases = int(f.readline().strip())
-                for i in range(num_phases):
+                globals.num_phases = int(f.readline().strip())
+                for i in range(globals.num_phases):
                     line = f.readline()
                     if not line:
                         QMessageBox.critical(None, "Error", "Incorrect number of lines in phase file")
@@ -410,7 +396,7 @@ def IL_auto(w):
 
         if globals.LUTmode != 0:
             while globals.greyR < 256:
-                for globals.LUTphase in range(num_phases):
+                for globals.LUTphase in range(globals.num_phases):
                     if globals.greyR >= 0:
                         Next_greyR(w, +0)
 
@@ -419,7 +405,7 @@ def IL_auto(w):
                         if globals.greyR == 0 and globals.LUTmode not in (16, 18, 52):
                             globals.ILfilt = 1
 
-                    globals.ILcnt = 1 - iLdelay
+                    globals.ILcnt = 1 - globals.iLdelay
                     globals.ILavg = 0.0
                     globals.CHRuAvg = 0.0
                     globals.CHRvAvg = 0.0
@@ -431,12 +417,12 @@ def IL_auto(w):
                         break
 
                     # Store luminance
-                    autoLumVal[globals.ILautoNum] = globals.ILavg
-                    autoLumRGB[globals.ILautoNum] = globals.lastRGB
+                    globals.autoLumVal[globals.ILautoNum] = globals.ILavg
+                    globals.autoLumRGB[globals.ILautoNum] = globals.lastRGB
 
                     # Store chrominance
-                    autoCHRuVal[globals.ILautoNum] = globals.CHRuAvg
-                    autoCHRvVal[globals.ILautoNum] = globals.CHRvAvg
+                    globals.autoCHRuVal[globals.ILautoNum] = globals.CHRuAvg
+                    globals.autoCHRvVal[globals.ILautoNum] = globals.CHRvAvg
 
                     # Update display strings
                     globals.greyR_display = f"{max(globals.greyR + globals.greyR_offset, 0):3d}"
@@ -481,14 +467,14 @@ def IL_auto(w):
                 if globals.greyR == 255:
                     break
 
-                Next_greyR(w, dGrey)
+                Next_greyR(w, globals.dGrey)
                 QApplication.processEvents()
 
     else:  # demo mode
         globals.avgN = 2
-        iLdelay = 2
-        dGrey = 15
-        num_phases = 1
+        globals.iLdelay = 2
+        globals.dGrey = 15
+        globals.num_phases = 1
 
         while globals.greyR < 256:
             globals.ILavg = float(globals.greyR) if globals.greyR >= 0 else 0.0
@@ -498,19 +484,19 @@ def IL_auto(w):
             delay(1000)
             globals.ILautoNum += 1
 
-            autoLumVal[globals.ILautoNum] = globals.ILavg
-            autoLumRGB[globals.ILautoNum] = globals.lastRGB
-            autoCHRuVal[globals.ILautoNum] = globals.CHRuAvg
-            autoCHRvVal[globals.ILautoNum] = globals.CHRvAvg
+            globals.autoLumVal[globals.ILautoNum] = globals.ILavg
+            globals.autoLumRGB[globals.ILautoNum] = globals.lastRGB
+            globals.autoCHRuVal[globals.ILautoNum] = globals.CHRuAvg
+            globals.autoCHRvVal[globals.ILautoNum] = globals.CHRvAvg
 
             globals.greyR_display = f"{max(globals.greyR + globals.greyR_offset, 0):3d}"
 
             if globals.greyR == 255 or globals.record == 0:
                 break
 
-            Next_greyR(w, dGrey)
+            Next_greyR(w, globals.dGrey)
 
-        dGrey = 1  # reset
+        globals.dGrey = 1  # reset
 
     # After loop – wrap up
     globals.ILfilt = 0
@@ -548,6 +534,8 @@ def IL_auto(w):
         "SAVE RESULTS BEFORE CHANGING SETTINGS\n\n"
         "Would you like to view the log file?"
     )
+
+    globals.ILdataReady = 1
 
     answer = QMessageBox.question(
         None, "View Log File?", textmsg,

@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 
 from window_initializer import initialize
 from meter_initializer import il_init
+from saver import IL_save
 from recorder import IL_rec
 
 def create_button(text, on_click):
@@ -36,7 +37,7 @@ layout.addWidget(create_button("Init Meter", il_init))
 btn_rec = create_button("RECORD", handle_record)
 layout.addWidget(btn_rec)
 
-layout.addWidget(create_button("Reserved 2", lambda: None))
+layout.addWidget(create_button("Save", IL_save))
 
 window.setLayout(layout)
 window.show()

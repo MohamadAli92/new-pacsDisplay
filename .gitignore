@@ -1,2 +1,3 @@
 *.db
 .idea/vcs.xml
+new_ver/__pycache__
