@@ -229,6 +229,8 @@ puts "        07/2022 - M.J Flynn, P.M Tchou, N.B Bevins"
 # Variable definitions and procedures from other files
 # reference to 'apps_path directory to support wrapping with tclApp
 
+lappend auto_path [file normalize [file join [file dirname [info script]] ".." "base64"]]
+
 package require base64	  ;# used for converting plots for embedding into html.
 
 source LRconfig.txt        ;# variable definitions (not wrapped)
@@ -605,6 +607,30 @@ label .lumMeter.outlier -text "OUTLIER" -font {courier 8 bold} \
 place .lumMeter.outlier -in .lumMeter -anchor nw -relx .7 -rely .85
 
 pack  .lumMeter
+
+text .log -width 80 -height 20 -wrap none
+pack .log -fill both -expand 1
+
+# تابعی برای اضافه کردن خط جدید به log
+proc log_write {msg} {
+    .log insert end "$msg\n"
+    .log see end  ;# اسکرول خودکار به انتها
+}
+
+# جایگزینی puts با log_write
+rename puts original_puts
+proc puts {args} {
+    # پردازش حالت‌های مختلف puts
+    if {[llength $args] == 1} {
+        set msg [lindex $args 0]
+        log_write $msg
+    } elseif {[llength $args] == 2 && [lindex $args 0] eq "stdout"} {
+        log_write [lindex $args 1]
+    } else {
+        # اگر مقصد غیر از stdout باشه، به puts اصلی بده
+        eval original_puts $args
+    }
+}
 
 #*********************************************************************
 # Procedures 
@@ -1283,6 +1309,7 @@ proc IL_init {} {
 	set ILdataReady 0  ;# block saving until auto measurements are made
 	set ILfilt      0  ;# turn data filtering off until needed
 	set lastILavg   0
+
 	return
 }
 #
@@ -1369,6 +1396,8 @@ proc IL_save {} {
 				incr majorPnum
 			}
 
+			puts "numPhases: $numPhases | minorPnum: $minorPnum majorPnum: $majorPnum"
+
 			set j [expr $i-1]
 			set k [expr $i-3]
 			set dLL($i) [expr ($autoLumVal($i) - $autoLumVal($j))/(($autoLumVal($i) + $autoLumVal($j))/2.0)]
@@ -1379,6 +1408,49 @@ proc IL_save {} {
 		}
 #		... flush the io and close the file
 		flush $io_file ; close $io_file
+
+		set varnames {
+			ILstatus
+			ILdataReady
+			lumFilePath
+			LUTmode
+			ILautoNum
+			autoLumVal
+			autoLumRGB
+			gnuplot
+			plotFileName
+			numPhases
+			iLdelay
+			avgN
+			ILlimit_plus
+			ILlimit_minus
+			title
+			DisplayName
+			plotULRname
+			plotdLLname
+			meter
+			autoCHRuVal
+			autoCHRvVal
+		}
+
+		foreach var $varnames {
+			if {[info exists $var]} {
+				if {[array exists $var]} {
+					upvar 0 $var arr
+					set parts {}
+					foreach key [lsort [array names arr]] {
+						lappend parts "($key - $arr($key))"
+					}
+					set value [join $parts " "]
+				} else {
+					set value [set $var]
+				}
+			} else {
+				set value "Undefined"
+			}
+
+			puts "$var - $value"
+		}
 
 #		... option to plot the dL/L data
 		if {$LUTmode == 256 || $LUTmode == 52 || $LUTmode == 18 || $LUTmode == 16} {

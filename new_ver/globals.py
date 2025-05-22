@@ -78,7 +78,7 @@ CHRvAvg = 0.0
 autoCHRuVal = {}
 autoCHRvVal = {}
 
-avgN = 3
+avgN = 1
 
 ioneInit = 0
 ioneReading = ""
@@ -109,7 +109,7 @@ outlierAccept = 0
 
 absChange = 0.0
 relChange = 0.0
-ILlimit_plus = 0.05
+ILlimit_plus = 0.20
 ILlimit_minus = -0.05
 ILlimit_abs = 0.02
 pause_flag = 0

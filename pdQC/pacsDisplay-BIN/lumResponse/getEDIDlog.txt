@@ -1,5 +1,5 @@
 # log file for getEDID v1.1
-5/12/2025 17:52
+5/20/2025 9:50
 Error Code = 0
 argv[0] =  C:\Users\pc\Desktop\pacsdisplay\pdQC\pacsDisplay-BIN\lumResponse\BIN-LR\getEDID.exe
 argv[1] =  1
